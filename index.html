@@ -3,19 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GainTerrain | Signal Intelligence</title>
+    <title>Gain Terrain | Signal Intelligence</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2245%22 fill=%22%23050505%22 stroke=%22%2300ff41%22 stroke-width=%225%22/><circle cx=%2250%22 cy=%2250%22 r=%2210%22 fill=%22%2300ff41%22/><path d=%22M50 50 L90 20%22 stroke=%22%2300ff41%22 stroke-width=%223%22 opacity=%220.8%22/></svg>">
     <style>
         /* --- RESET & BASE STYLES --- */
         :root {
-            --bg-color: #050505;
+            --bg-color: #020202;
             --text-color: #e0e0e0;
-            --accent-color: #00ff41; /* "Hacker" Green */
-            --secondary-color: #1a1a1a;
-            --font-main: 'Courier New', Courier, monospace; /* Tech/Code feel */
-            --font-head: 'Arial', sans-serif;
-            --cursor-x: 50vw;
-            --cursor-y: 50vh;
+            --c-gsm: #00ff41;   /* Hacker Green */
+            --c-5g:  #00f3ff;   /* Cyber Blue */
+            --c-fm:  #ff0055;   /* Radio Red */
+            --c-tv:  #ffaa00;   /* Analog Orange */
+            --c-ham: #bd00ff;   /* Amateur Purple */
+            --c-sat: #00f3ff;   /* Satellite Cyan */
+            --c-beam:#ff0055;   /* Laser Red */
+            --font-main: 'Courier New', Courier, monospace; 
+            --font-head: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         body, html {
@@ -25,457 +28,537 @@
             color: var(--text-color);
             font-family: var(--font-head);
             line-height: 1.6;
-            scroll-behavior: smooth;
+            width: 100%;
+            height: 100%;
             overflow-x: hidden;
-            cursor: crosshair;
         }
 
         a { text-decoration: none; color: inherit; transition: 0.3s; }
-        ul { list-style: none; padding: 0; }
 
-        /* --- THE RF SCANNER EFFECT (DOTS + CONTOURS) --- */
-        
-        /* Layer 1: The Contour Lines (Radar effect) */
-        .contour-bg {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 0;
-            pointer-events: none;
-            opacity: 0.15;
-            background: repeating-radial-gradient(
-                circle at 50% 50%, 
-                #111 0, 
-                #111 40px, 
-                #222 41px, 
-                #222 42px
-            );
+        /* --- LAYOUT CONTAINERS --- */
+        .engine-section {
+            position: relative;
+            width: 100%;
+            height: 100vh; /* Full screen per engine */
+            overflow: hidden;
+            border-bottom: 2px solid #333;
         }
 
-        /* Layer 2: The Dot Matrix (Sensor Field) */
-        .rf-dots-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
+        .canvas-layer {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             z-index: 1;
-            pointer-events: none;
-            
-            /* The Dot Pattern */
-            background-image: radial-gradient(var(--accent-color) 1px, transparent 1px);
-            background-size: 30px 30px; /* Space between dots */
-            
-            /* MASK: Only reveal dots near mouse */
-            mask-image: radial-gradient(
-                circle 250px at var(--cursor-x) var(--cursor-y),
-                black 0%,
-                transparent 70%
-            );
-            -webkit-mask-image: radial-gradient(
-                circle 250px at var(--cursor-x) var(--cursor-y),
-                black 0%,
-                transparent 70%
-            );
-            opacity: 0.6;
         }
 
-        /* Layer 3: Ambient Glow */
-        .cursor-glow {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 1;
-            pointer-events: none;
-            background: radial-gradient(
-                circle 600px at var(--cursor-x) var(--cursor-y),
-                rgba(0, 255, 65, 0.04) 0%,
-                transparent 50%
-            );
+        .overlay-layer {
+            position: relative;
+            z-index: 10;
+            pointer-events: none; /* Let clicks pass to canvas if needed */
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
-        /* --- LIVE DATA HUD --- */
+        /* --- UI ELEMENTS (HUDs & Legends) --- */
         .hud-panel {
-            position: fixed;
+            position: absolute;
             bottom: 30px;
             right: 30px;
-            z-index: 1001;
+            pointer-events: auto;
             font-family: var(--font-main);
-            color: var(--accent-color);
-            font-size: 0.8rem;
+            color: var(--c-gsm);
+            font-size: 0.75rem;
             text-align: right;
-            background: rgba(0, 20, 0, 0.6);
+            background: rgba(0, 10, 0, 0.85);
             padding: 15px;
-            border-right: 3px solid var(--accent-color);
-            border-top: 1px solid rgba(0, 255, 65, 0.3);
-            backdrop-filter: blur(4px);
-            box-shadow: 0 0 15px rgba(0, 255, 65, 0.1);
+            border-right: 3px solid var(--c-gsm);
+            backdrop-filter: blur(8px);
+            min-width: 220px;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.1);
         }
 
-        .hud-row { display: block; margin-bottom: 4px; }
-        .hud-label { opacity: 0.7; font-size: 0.7rem; margin-right: 5px; }
-        .hud-val { font-weight: bold; text-shadow: 0 0 5px rgba(0, 255, 65, 0.5); }
+        .hud-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .hud-val { font-weight: bold; }
         .hud-divider { height: 1px; background: rgba(0, 255, 65, 0.3); margin: 8px 0; }
 
-        /* --- LAYOUT UTILITIES --- */
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-            position: relative;
-            z-index: 5;
-        }
-
-        /* --- HEADER / NAV --- */
-        header {
-            padding: 20px 0;
-            border-bottom: 1px solid #333;
-            position: fixed;
-            width: 100%;
-            background: rgba(5, 5, 5, 0.9);
-            z-index: 1000;
-            top: 0;
-            backdrop-filter: blur(5px);
-        }
-
-        nav {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
+        .legend-panel {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            pointer-events: auto;
             font-family: var(--font-main);
+            font-size: 0.7rem;
+            background: rgba(0, 5, 0, 0.8);
+            padding: 15px;
+            border-left: 3px solid #333;
+            backdrop-filter: blur(4px);
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            color: #ccc;
+        }
+        .legend-item { display: flex; align-items: center; gap: 10px; opacity: 0.9; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .line-legend { width: 15px; height: 2px; }
+
+        /* --- TEXT CONTENT --- */
+        .section-label {
+            position: absolute;
+            top: 100px; left: 30px;
+            font-family: var(--font-main);
+            font-size: 1.5rem; /* Big Size */
             font-weight: bold;
-            font-size: 1.5rem;
-            letter-spacing: -1px;
-        }
-
-        .logo span { color: var(--accent-color); }
-
-        .nav-links a {
-            margin-left: 30px;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #888;
-        }
-        .nav-links a:hover { color: var(--accent-color); text-shadow: 0 0 8px var(--accent-color); }
-
-        /* --- HERO SECTION --- */
-        .hero {
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            position: relative;
-        }
-
-        .hero-content {
-            z-index: 5;
-            max-width: 800px;
-        }
-
-        .tagline {
-            color: var(--accent-color);
-            font-family: var(--font-main);
-            font-size: 1rem;
-            margin-bottom: 20px;
-            display: block;
+            letter-spacing: 2px;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(0,0,0,0.8);
+            border: 2px solid #333;
+            padding: 10px 20px;
+            background: rgba(0,0,0,0.7);
+            z-index: 20;
         }
 
         h1 {
-            font-size: 3.5rem;
-            line-height: 1.1;
-            margin: 0 0 20px 0;
-            text-transform: uppercase;
-            letter-spacing: -2px;
+            font-size: 4rem; line-height: 1; margin: 0 0 20px 0;
+            text-transform: uppercase; letter-spacing: -2px;
+            text-shadow: 0 0 20px rgba(0,0,0,0.8);
+            text-align: center;
         }
 
-        p.lead {
-            font-size: 1.2rem;
-            color: #888;
-            margin-bottom: 40px;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
+        .hero-text {
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto;
+            background: radial-gradient(rgba(0,0,0,0.8), transparent 70%);
+            padding: 40px;
+            pointer-events: auto;
         }
 
         .btn {
-            display: inline-block;
-            padding: 15px 30px;
-            background: rgba(0, 255, 65, 0.05);
-            border: 1px solid var(--accent-color);
-            color: var(--accent-color);
-            font-family: var(--font-main);
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            cursor: pointer;
-            backdrop-filter: blur(2px);
+            display: inline-block; padding: 12px 30px;
+            border: 1px solid var(--c-gsm); color: var(--c-gsm);
+            font-family: var(--font-main); font-weight: bold;
+            text-transform: uppercase; background: rgba(0, 255, 65, 0.1);
+            cursor: pointer; backdrop-filter: blur(4px); margin-top: 20px;
         }
-
-        .btn:hover {
-            background: var(--accent-color);
-            color: #000;
-            box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+        .btn:hover { background: var(--c-gsm); color: #000; }
+        
+        .btn-small {
+            padding: 8px 15px; font-size: 0.75rem; margin-top: 10px;
+            border: 1px solid #555; color: #aaa;
         }
-
-        /* --- FEATURES (ROADMAP) SECTION --- */
-        .features {
-            padding: 100px 0;
-            position: relative;
-            z-index: 5;
-        }
-
-        .section-title { text-align: center; margin-bottom: 60px; }
-        .section-title h2 { font-size: 2rem; margin-bottom: 10px; }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 40px;
-        }
-
-        .card {
-            background: rgba(10, 10, 10, 0.85);
-            padding: 30px;
-            border: 1px solid #333;
-            transition: 0.3s;
-            backdrop-filter: blur(5px);
-        }
-
-        .card:hover {
-            border-color: var(--accent-color);
-            transform: translateY(-5px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-        }
-
-        .card-icon {
-            font-size: 2rem;
-            margin-bottom: 20px;
-            display: block;
-            text-shadow: 0 0 10px rgba(0,255,65,0.2);
-        }
-
-        .card h3 { margin-top: 0; font-family: var(--font-main); color: #fff; }
-        .card p { color: #888; font-size: 0.9rem; }
+        .btn-small:hover { border-color: var(--c-gsm); color: var(--c-gsm); background: rgba(0, 255, 65, 0.05); }
 
         /* --- TEAM SECTION --- */
-        .team {
-            padding: 100px 0;
-            background: rgba(5, 5, 5, 0.9);
-            border-top: 1px solid #333;
-            position: relative;
-            z-index: 5;
+        .team { padding: 80px 0; background: #080808; border-top: 1px solid #333; position: relative; z-index: 5; }
+        .team h2 { text-align: center; color: #fff; margin-bottom: 40px; font-size: 2rem; text-transform: uppercase; letter-spacing: -1px; }
+        
+        .team-grid {
+            display: flex; justify-content: center; gap: 60px; flex-wrap: wrap;
+            max-width: 1000px; margin: 0 auto;
         }
-
-        .team-member {
-            background: rgba(26, 26, 26, 0.6);
-            padding: 40px 20px;
-            text-align: center;
-            border: 1px solid #333;
-            transition: 0.3s;
-            backdrop-filter: blur(5px);
-        }
-
-        .team-member:hover {
-            border-color: var(--accent-color);
-            box-shadow: 0 0 15px rgba(0, 255, 65, 0.15);
-        }
-
+        
+        .team-member { text-align: center; }
+        
         .member-photo {
-            width: 150px;
-            height: 150px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 3px solid var(--accent-color);
-            margin-bottom: 20px;
-            background: #222;
+            width: 160px; height: 160px; border-radius: 50%;
+            object-fit: cover; border: 2px solid var(--c-gsm);
+            margin-bottom: 20px; background: #222;
         }
+        
+        .team-member h3 { margin: 0 0 5px 0; color: #fff; font-size: 1.3rem; }
+        .team-member .role { color: var(--c-gsm); font-size: 0.85rem; font-family: var(--font-main); text-transform: uppercase; letter-spacing: 1px;}
 
-        .team-member h3 { margin: 0 0 10px 0; color: #fff; font-size: 1.3rem; }
-        .team-member .role {
-            font-family: var(--font-main); color: var(--accent-color);
-            font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;
-            margin: 0; font-weight: bold;
+        /* --- HEADER & FOOTER --- */
+        header {
+            padding: 20px 0; border-bottom: 1px solid #333;
+            position: fixed; width: 100%; background: rgba(2, 2, 2, 0.95);
+            z-index: 1000; top: 0;
         }
+        nav { 
+            display: flex; justify-content: space-between; align-items: center; 
+            max-width: 1200px; margin: 0 auto; padding: 0 20px;
+        }
+        .logo { font-family: var(--font-main); font-weight: 800; font-size: 1.5rem; letter-spacing: -1px; }
+        .logo span { color: var(--c-gsm); }
+        .nav-links a { margin-left: 30px; font-size: 0.85rem; text-transform: uppercase; color: #888; }
+        .nav-links a:hover { color: var(--c-gsm); }
 
-        /* --- FOOTER --- */
         footer {
-            padding: 40px 0;
-            text-align: center;
-            border-top: 1px solid #333;
-            background: #111;
-            color: #555;
-            font-size: 0.8rem;
-            font-family: var(--font-main);
-            position: relative;
-            z-index: 5;
+            padding: 40px 0; text-align: center; background: #000;
+            color: #555; font-size: 0.8rem; font-family: var(--font-main);
+            border-top: 1px solid #222;
         }
-
-        /* --- RESPONSIVE --- */
-        @media (max-width: 768px) { h1 { font-size: 2.5rem; } }
     </style>
 </head>
 <body>
 
-    <div class="contour-bg"></div>
-    <div class="cursor-glow"></div>
-    <div class="rf-dots-overlay"></div>
-    
-    <div class="hud-panel">
-        <div class="hud-row"><span class="hud-label">LAT</span> <span class="hud-val" id="hud-lat">38.9072</span></div>
-        <div class="hud-row"><span class="hud-label">LON</span> <span class="hud-val" id="hud-lon">-95.2350</span></div>
-        <div class="hud-row"><span class="hud-label">ELEV</span> <span class="hud-val" id="hud-elev">284</span> <span style="font-size:10px">m</span></div>
-        
-        <div class="hud-divider"></div>
-        
-        <div class="hud-row"><span class="hud-label">SOURCES</span> <span class="hud-val" id="hud-sources">0</span></div>
-        <div class="hud-row"><span class="hud-label">SPECTRUM</span> <span class="hud-val" id="hud-band">SCANNING...</span></div>
-        
-        <div style="margin-top:8px; font-size: 9px; opacity: 0.5; letter-spacing: 1px;">[LIVE FEED]</div>
-    </div>
-
     <header>
-        <div class="container">
-            <nav>
-                <div class="logo">GAIN<span>TERRAIN</span></div>
-                <div class="nav-links">
-                    <a href="#features">Roadmap</a>
-                    <a href="#team">Team</a>
-                    <a href="https://github.com/ForgingOps/GainTerrain" target="_blank">GitHub</a>
-                </div>
-            </nav>
-        </div>
+        <nav>
+            <div class="logo">GAIN<span>TERRAIN</span></div>
+            <div class="nav-links">
+                <a href="#terrestrial">Terrestrial</a>
+                <a href="#orbital">Orbit</a>
+                <a href="#team">Team</a>
+                <a href="https://github.com/ForgingOps/GainTerrain" target="_blank">GitHub</a>
+            </div>
+        </nav>
     </header>
 
-    <section class="hero">
-        <div class="container hero-content">
-            <span class="tagline">VISIBILITY FOR THE INVISIBLE</span>
-            <h1>Dominance Through<br>Signal Intelligence</h1>
-            <p class="lead">
-                A unified 3D visualization engine mapping the planet's electromagnetic spectrum—from terrestrial towers to orbital assets.
-            </p>
-            <a href="https://github.com/ForgingOps/GainTerrain" class="btn">View Source Code</a>
+    <section id="terrestrial" class="engine-section">
+        <canvas id="canvas-2d" class="canvas-layer"></canvas>
+        
+        <div class="section-label">PHASE 1: TERRESTRIAL</div>
+
+        <div class="overlay-layer">
+            <div class="hero-text">
+                <h1>Dominance Through<br>Signal Intelligence</h1>
+                <p style="color:#ccc; font-size:1.1rem;">
+                    A unified engine mapping the planet's electromagnetic spectrum. <br>
+                    Move your cursor to scan the RF environment.
+                </p>
+                <a href="https://www.linkedin.com/company/forgingops" target="_blank" class="btn">Contact Us</a>
+            </div>
+        </div>
+
+        <div class="legend-panel">
+            <div class="legend-item"><div class="dot" style="background:var(--c-gsm)"></div> GSM / LTE</div>
+            <div class="legend-item"><div class="dot" style="background:var(--c-5g)"></div> 5G mmWave</div>
+            <div class="legend-item"><div class="dot" style="background:var(--c-fm)"></div> FM Radio</div>
+            <div class="legend-item"><div class="dot" style="background:var(--c-tv)"></div> Digital TV</div>
+            <div class="legend-item"><div class="dot" style="background:var(--c-ham)"></div> HAM / Amateur</div>
+        </div>
+
+        <div class="hud-panel">
+            <div class="hud-row"><span style="opacity:0.6">SCANNER FEED</span></div>
+            <div class="hud-divider"></div>
+            <div class="hud-row"><span>COORDS</span> <span class="hud-val" id="hud-latlon">Scanning...</span></div>
+            <div class="hud-row"><span>BAND</span> <span class="hud-val" id="hud-band">---</span></div>
+            <div class="hud-row"><span>RSSI</span> <span class="hud-val" id="hud-rssi">--- dBm</span></div>
+            <div class="hud-row"><span>LINKS</span> <span class="hud-val" id="hud-links-2d">0</span></div>
         </div>
     </section>
 
-    <section id="features" class="features">
-        <div class="container">
-            <div class="section-title">
-                <h2>The Roadmap</h2>
-                <p style="color:#666; font-family: var(--font-main);">OPEN SOURCE SIGNAL INTELLIGENCE</p>
-            </div>
 
-            <div class="grid">
-                <div class="card">
-                    <span class="card-icon">📡</span>
-                    <h3>Phase 1: Terrestrial</h3>
-                    <p>
-                        <strong>"The Lobe on the Land."</strong>
-                        We map terrestrial transmitters and calculate 3D antenna radiation patterns against occlusion layers (mountains/buildings).
-                    </p>
-                </div>
+    <section id="orbital" class="engine-section">
+        <canvas id="canvas-3d" class="canvas-layer"></canvas>
 
-                <div class="card">
-                    <span class="card-icon">🛰️</span>
-                    <h3>Phase 2: Orbital</h3>
-                    <p>
-                        <strong>"The Cone of Silence."</strong>
-                        Real-time visualization of satellite constellations (LEO/GEO), downlink footprints, and pass windows.
-                    </p>
-                </div>
+        <div class="section-label" style="top:100px; border-color: var(--c-sat); color: var(--c-sat);">PHASE 2: ORBITAL</div>
 
-                <div class="card">
-                    <span class="card-icon">🔗</span>
-                    <h3>Phase 3: The Link</h3>
-                    <p>
-                        <strong>"Dynamic Handover."</strong>
-                        Physics-accurate line-of-sight calculations connecting ground assets to space infrastructure in real-time.
-                    </p>
-                </div>
-            </div>
+        <div class="legend-panel">
+            <div class="legend-item"><div class="dot" style="background:var(--c-sat)"></div> LEO Constellation</div>
+            <div class="legend-item"><div class="line-legend" style="background:var(--c-beam)"></div> Downlink Beam</div>
+            <div class="legend-item"><div class="dot" style="background:rgba(0, 255, 65, 0.4)"></div> Ground Station</div>
+        </div>
+
+        <div class="hud-panel" style="border-right-color: var(--c-sat); color: var(--c-sat);">
+            <div class="hud-row"><span style="opacity:0.6">SATCOM UPLINK</span></div>
+            <div class="hud-divider" style="background: rgba(0, 243, 255, 0.3);"></div>
+            
+            <div class="hud-row"><span>TARGET LAT/LON</span> <span class="hud-val" id="hud-target-loc">CALCULATING</span></div>
+            <div class="hud-row"><span>ALTITUDE</span> <span class="hud-val" id="hud-alt">550 km</span></div>
+            <div class="hud-row"><span>ACTIVE BEAMS</span> <span class="hud-val" id="hud-links-3d">0</span></div>
+            <div class="hud-row"><span>CONSTELLATION</span> <span class="hud-val" id="hud-sats">0</span></div>
         </div>
     </section>
 
     <section id="team" class="team">
-        <div class="container">
-            <div class="section-title">
-                <h2>Project Leaders</h2>
-                <p style="color:#666; font-family: var(--font-main);">THE HUMANS BEHIND THE SIGNAL</p>
+        <h2>Project Leaders</h2>
+        <div class="team-grid">
+            <div class="team-member">
+                <img src="https://via.placeholder.com/150/333333/808080?text=Sowmya" alt="Sowmya Laveti" class="member-photo">
+                <h3>Sowmya Laveti</h3>
+                <p class="role">Lead Software Architect</p>
+                <a href="https://www.linkedin.com/in/sowmya-laveti-674917259/" target="_blank" class="btn btn-small">Connect on LinkedIn</a>
             </div>
-
-            <div class="grid" style="max-width: 800px; margin: 0 auto;">
-                <div class="team-member">
-                    <img src="https://via.placeholder.com/150/333333/808080?text=Soumya" alt="Soumya Laveti" class="member-photo">
-                    <h3>Soumya Laveti</h3>
-                    <p class="role">Lead Software Architect and Developer</p>
-                </div>
-                
-                <div class="team-member">
-                    <img src="https://via.placeholder.com/150/333333/808080?text=Hara" alt="Hara Madhav Talasila" class="member-photo">
-                    <h3>Hara Madhav Talasila</h3>
-                    <p class="role">Idea, Math, Physics</p>
-                </div>
+            <div class="team-member">
+                <img src="https://via.placeholder.com/150/333333/808080?text=Hara" alt="Dr. Hara Madhav Talasila" class="member-photo">
+                <h3>Dr. Hara Madhav Talasila</h3>
+                <p class="role">Physics & Strategy</p>
+                <a href="https://www.linkedin.com/in/haramadhav/" target="_blank" class="btn btn-small">Connect on LinkedIn</a>
             </div>
         </div>
     </section>
 
     <footer>
-        <div class="container">
-            <p>GAINTERRAIN © 2025 // OPEN SOURCE INITIATIVE</p>
-            <p>Forged in Kansas • For Ground and Orbit </p>
-        </div>
+        <p>GAINTERRAIN © 2026 // FORGING OPS INITIATIVE</p>
+        <p>Forged in Kansas • For Ground and Orbit</p>
     </footer>
 
     <script>
-        // 1. Mouse Tracking for Flashlight/Scan Effect
-        const root = document.documentElement;
-        let lastX = 0;
-        let lastY = 0;
-
-        document.addEventListener('mousemove', (e) => {
-            lastX = e.clientX;
-            lastY = e.clientY;
-            root.style.setProperty('--cursor-x', lastX + "px");
-            root.style.setProperty('--cursor-y', lastY + "px");
+        /**
+         * ENGINE 1: 2D TERRESTRIAL SIMULATOR
+         */
+        (function() {
+            const canvas = document.getElementById('canvas-2d');
+            const ctx = canvas.getContext('2d');
+            let width, height;
+            let mouseX = -100, mouseY = -100;
             
-            // Coordinate Logic (Simulated)
-            const lat = 38.90 + (lastY * 0.00005);
-            const lon = -95.23 + (lastX * 0.00005);
-            
-            // Elevation Logic (Perlin Noise Simulation)
-            // Use X/Y to create pseudo-random but consistent elevation changes
-            const elevNoise = Math.sin(lastX * 0.01) + Math.cos(lastY * 0.01);
-            const elev = 280 + Math.floor(elevNoise * 20);
+            // Config
+            const transmitterCount = 20;
+            const linkThreshold = 350;
+            const BANDS = [
+                { type: "GSM/LTE", color: "#00ff41" },
+                { type: "5G mmW",  color: "#00f3ff" },
+                { type: "FM RAD",  color: "#ff0055" },
+                { type: "D-TV",    color: "#ffaa00" },
+                { type: "HAM",     color: "#bd00ff" }
+            ];
+            const transmitters = [];
 
-            document.getElementById('hud-lat').innerText = lat.toFixed(4);
-            document.getElementById('hud-lon').innerText = lon.toFixed(4);
-            document.getElementById('hud-elev').innerText = elev;
-        });
+            // HUD Refs
+            const elLatLon = document.getElementById('hud-latlon');
+            const elBand = document.getElementById('hud-band');
+            const elRssi = document.getElementById('hud-rssi');
+            const elLinks = document.getElementById('hud-links-2d');
 
-        // 2. Simulate Signal Detection Logic
-        const bands = ["UHF", "L-BAND", "S-BAND", "C-BAND", "X-BAND", "Ku-BAND"];
-        
-        function updateHud() {
-            // Source Count Logic: 
-            // If mouse moves fast, we "scan" more area, find more sources.
-            // For now, random fluctuation:
-            const sources = Math.floor(Math.random() * 12); 
-            document.getElementById('hud-sources').innerText = sources;
+            function resize() {
+                width = window.innerWidth;
+                height = window.innerHeight;
+                canvas.width = width;
+                canvas.height = height;
+                initTransmitters();
+            }
+            window.addEventListener('resize', resize);
 
-            // Spectrum Logic:
-            // Randomly 'detect' a dominant band if sources > 0
-            if (sources > 0) {
-                const randomBand = bands[Math.floor(Math.random() * bands.length)];
-                document.getElementById('hud-band').innerText = randomBand;
-                document.getElementById('hud-band').style.color = "#00ff41";
-            } else {
-                document.getElementById('hud-band').innerText = "SEARCHING...";
-                document.getElementById('hud-band').style.color = "#555";
+            document.addEventListener('mousemove', (e) => {
+                if(e.clientY < window.innerHeight) {
+                    mouseX = e.clientX;
+                    mouseY = e.clientY;
+                } else {
+                    mouseX = -1000;
+                }
+            });
+
+            function initTransmitters() {
+                transmitters.length = 0;
+                for(let i=0; i<transmitterCount; i++) {
+                    transmitters.push({
+                        x: Math.random() * width,
+                        y: Math.random() * height,
+                        band: BANDS[Math.floor(Math.random() * BANDS.length)],
+                        pulsePhase: Math.random() * Math.PI * 2
+                    });
+                }
             }
 
-            setTimeout(updateHud, 800); // Update every 800ms (slower read than freq)
-        }
-        
-        updateHud(); // Start simulation
+            function updateHud() {
+                if(mouseX < 0) return;
+
+                const lat = 38.90 + (1 - mouseY/height) * 0.1;
+                const lon = -95.23 + (mouseX/width) * 0.1;
+                elLatLon.innerText = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+
+                let nearestDist = Infinity;
+                let nearestTx = null;
+                let activeLinks = 0;
+
+                transmitters.forEach(tx => {
+                    const d = Math.hypot(mouseX - tx.x, mouseY - tx.y);
+                    if (d < linkThreshold) activeLinks++;
+                    if (d < nearestDist) { nearestDist = d; nearestTx = tx; }
+                });
+
+                elLinks.innerText = activeLinks;
+
+                if(nearestTx && nearestDist < linkThreshold) {
+                    elBand.innerText = nearestTx.band.type;
+                    elBand.style.color = nearestTx.band.color;
+                    let rssi = -30 - (20 * Math.log10(nearestDist + 1));
+                    elRssi.innerText = rssi.toFixed(1) + " dBm";
+                    elRssi.style.color = rssi > -70 ? nearestTx.band.color : "#666";
+                } else {
+                    elBand.innerText = "---";
+                    elRssi.innerText = "---";
+                }
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, width, height);
+
+                // Grid
+                ctx.strokeStyle = '#111'; ctx.lineWidth = 1;
+                for(let x=0; x<width; x+=60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke(); }
+                for(let y=0; y<height; y+=60) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); }
+
+                const time = Date.now() / 1000;
+
+                // Transmitters
+                transmitters.forEach(tx => {
+                    const pulse = (Math.sin(time * 2 + tx.pulsePhase) + 1) / 2;
+                    ctx.fillStyle = tx.band.color;
+                    ctx.beginPath(); ctx.arc(tx.x, tx.y, 3, 0, Math.PI * 2); ctx.fill();
+                    
+                    ctx.strokeStyle = tx.band.color;
+                    ctx.globalAlpha = 0.2 * (1-pulse);
+                    ctx.beginPath(); ctx.arc(tx.x, tx.y, 10 + (pulse * 40), 0, Math.PI * 2); ctx.stroke();
+                    ctx.globalAlpha = 1.0;
+                });
+
+                // Mouse Interactions
+                if(mouseX > 0) {
+                    updateHud();
+                    transmitters.forEach(tx => {
+                        const d = Math.hypot(mouseX - tx.x, mouseY - tx.y);
+                        if(d < linkThreshold) {
+                            ctx.beginPath();
+                            ctx.moveTo(mouseX, mouseY);
+                            ctx.lineTo(tx.x, tx.y);
+                            ctx.strokeStyle = tx.band.color;
+                            ctx.globalAlpha = 1 - (d / linkThreshold);
+                            ctx.setLineDash([3, 3]);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+                            ctx.globalAlpha = 1.0;
+                        }
+                    });
+
+                    const grad = ctx.createRadialGradient(mouseX, mouseY, 10, mouseX, mouseY, 300);
+                    grad.addColorStop(0, 'rgba(0, 255, 65, 0.1)');
+                    grad.addColorStop(1, 'rgba(0,0,0,0)');
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(0,0,width,height);
+                }
+
+                requestAnimationFrame(animate);
+            }
+
+            resize();
+            animate();
+        })();
+
+
+        /**
+         * ENGINE 2: 3D ORBITAL SIMULATOR
+         */
+        (function() {
+            const canvas = document.getElementById('canvas-3d');
+            const ctx = canvas.getContext('2d');
+            let width, height;
+            let rotation = 0;
+
+            const elSats = document.getElementById('hud-sats');
+            const elLinks = document.getElementById('hud-links-3d');
+            const elTarget = document.getElementById('hud-target-loc');
+
+            const globeRadius = 200;
+            const dots = [];
+            const satellites = [];
+
+            function resize() {
+                const rect = canvas.parentElement.getBoundingClientRect();
+                width = rect.width;
+                height = rect.height;
+                canvas.width = width;
+                canvas.height = height;
+            }
+            window.addEventListener('resize', resize);
+
+            // Init 3D Data
+            for (let lat = -90; lat <= 90; lat += 15) {
+                const r = globeRadius * Math.cos(lat * Math.PI / 180);
+                const y = globeRadius * Math.sin(lat * Math.PI / 180);
+                for (let lon = 0; lon < 360; lon += 10) {
+                    dots.push({ x: r * Math.cos(lon * Math.PI / 180), y: y, z: r * Math.sin(lon * Math.PI / 180) });
+                }
+            }
+            // SLOWER SATS
+            for(let i=0; i<12; i++) {
+                satellites.push({
+                    angle: Math.random() * Math.PI * 2,
+                    speed: 0.001 + Math.random() * 0.002, // SLOWED DOWN
+                    radius: globeRadius + 60 + Math.random() * 100,
+                    inclination: (Math.random() - 0.5) * 2
+                });
+            }
+            if(elSats) elSats.innerText = satellites.length;
+
+            function project(x, y, z) {
+                const scale = 800 / (800 + z); 
+                return {
+                    x: width/2 + x * scale,
+                    y: height/2 + y * scale,
+                    scale: scale
+                };
+            }
+
+            function rotateY(x, y, z, angle) {
+                return {
+                    x: x * Math.cos(angle) - z * Math.sin(angle),
+                    y: y,
+                    z: x * Math.sin(angle) + z * Math.cos(angle)
+                };
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, width, height);
+                rotation += 0.001; // Slower Earth rotation too
+                
+                // Simulate "Tracking Coordinates" based on rotation
+                const baseLat = 38.90;
+                const baseLon = -95.23;
+                const simLon = (baseLon + (rotation * 100)) % 180;
+                if(elTarget) elTarget.innerText = `${baseLat.toFixed(2)}, ${simLon.toFixed(2)}`;
+
+                // Draw Earth
+                ctx.fillStyle = 'rgba(0, 243, 255, 0.3)'; // Cyan
+                dots.forEach(dot => {
+                    const r = rotateY(dot.x, dot.y, dot.z, rotation);
+                    const tilt = 0.3;
+                    const y_tilted = r.y * Math.cos(tilt) - r.z * Math.sin(tilt);
+                    const z_tilted = r.y * Math.sin(tilt) + r.z * Math.cos(tilt);
+                    const p = project(r.x, y_tilted, z_tilted);
+
+                    if (z_tilted < 0) ctx.fillRect(p.x, p.y, 1.5, 1.5); // Front
+                    else {
+                        ctx.fillStyle = 'rgba(0, 243, 255, 0.05)';
+                        ctx.fillRect(p.x, p.y, 1, 1); // Back
+                        ctx.fillStyle = 'rgba(0, 243, 255, 0.3)'; // Restore
+                    }
+                });
+
+                // Draw Satellites
+                let activeLinks = 0;
+                satellites.forEach(sat => {
+                    sat.angle += sat.speed;
+                    const sx = sat.radius * Math.cos(sat.angle);
+                    const sz = sat.radius * Math.sin(sat.angle);
+                    const sy = sz * sat.inclination;
+
+                    // Camera Tilt
+                    const tilt = 0.3;
+                    const y_tilted = sy * Math.cos(tilt) - sz * Math.sin(tilt);
+                    const z_tilted = sy * Math.sin(tilt) + sz * Math.cos(tilt);
+                    
+                    const p = project(sx, y_tilted, z_tilted);
+
+                    if(z_tilted < 100) {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+                        ctx.fillStyle = '#00f3ff'; 
+                        ctx.fill();
+
+                        // Beam logic (Flash red occasionally)
+                        if(Math.random() > 0.5) {
+                            ctx.beginPath();
+                            ctx.moveTo(p.x, p.y);
+                            ctx.lineTo(width/2, height/2 + 20); // Center "Ground Station"
+                            ctx.strokeStyle = `rgba(255, 0, 85, ${Math.random() * 0.3})`;
+                            ctx.stroke();
+                            activeLinks++;
+                        }
+                    }
+                });
+                if(elLinks) elLinks.innerText = activeLinks;
+
+                requestAnimationFrame(animate);
+            }
+
+            resize();
+            animate();
+        })();
     </script>
 </body>
 </html>
